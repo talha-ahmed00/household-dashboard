@@ -17,166 +17,170 @@ st.set_page_config(
 # ---------------------------
 # Helpers
 # ---------------------------
-@st.cache_data
-def load_data():
-    # Household Size
-    size_data = pd.DataFrame([
-        {"Code": 1, "Label": "1 Person", "Count": 112702, "Percent": 26.75},
-        {"Code": 2, "Label": "2 People", "Count": 94563, "Percent": 22.45},
-        {"Code": 3, "Label": "3 People", "Count": 73065, "Percent": 17.34},
-        {"Code": 4, "Label": "4 People", "Count": 61513, "Percent": 14.60},
-        {"Code": 5, "Label": "5 People", "Count": 43247, "Percent": 10.27},
-        {"Code": 6, "Label": "6 People", "Count": 22991, "Percent": 5.46},
-        {"Code": 7, "Label": "7 People", "Count": 9483, "Percent": 2.25},
-        {"Code": 8, "Label": "8 People", "Count": 3178, "Percent": 0.75},
-        {"Code": 9, "Label": "9 or more People", "Count": 512, "Percent": 0.12},
-    ])
+import json
 
-    # Marital Status
-    marital_data = pd.DataFrame([
-        {"Code": "A", "Label": "Inferred Married", "Count": 1884, "Percent": 0.45},
-        {"Code": "B", "Label": "Inferred Single", "Count": 444, "Percent": 0.11},
-        {"Code": "M", "Label": "Married", "Count": 183131, "Percent": 43.47},
-        {"Code": "S", "Label": "Single", "Count": 208958, "Percent": 49.60},
-        {"Code": "U", "Label": "Unknown", "Count": 26837, "Percent": 6.37},
-    ])
+# --- Google Sheets helpers (optional) ---
+# This app will automatically use a Google Sheet if Streamlit secrets are
+# configured. Otherwise it falls back to the built-in sample data.
+#
+# Configure Streamlit Cloud (or local .streamlit/secrets.toml):
+#
+# [gcp_service_account]
+# type = "service_account"
+# project_id = "..."
+# private_key_id = "..."
+# private_key = "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+# client_email = "...@...gserviceaccount.com"
+# client_id = "..."
+#
+# [sheets]
+# SHEET_ID = "<your-google-sheet-id>"
+#
+# Each worksheet/tab should be named exactly:
+#   Household Size, Household Marital Status, Dwelling Type, Gender,
+#   Presence of Children, Estimated Household Income, Networth, Age, Home Owner
+# with columns like: Code | Label | Count | Percent  (Age uses Age | Count | Percent)
 
-    # Dwelling Type
-    dwelling_data = pd.DataFrame([
-        {"Code": "S", "Label": "Single Family Dwelling Unit", "Count": 421254, "Percent": 100.00},
-    ])
+try:
+    import gspread
+    from google.oauth2.service_account import Credentials
+    _GS_OK = True
+except Exception:
+    _GS_OK = False
 
-    # Gender
-    gender_data = pd.DataFrame([
-        {"Code": "F", "Label": "Female", "Count": 225964, "Percent": 53.64},
-        {"Code": "M", "Label": "Male", "Count": 195290, "Percent": 46.36},
-    ])
+@st.cache_resource(show_spinner=False)
+def _get_gs_client():
+    if not _GS_OK:
+        raise RuntimeError("gspread not installed. Add gspread and google-auth to requirements.")
+    if "gcp_service_account" not in st.secrets or "sheets" not in st.secrets or "SHEET_ID" not in st.secrets["sheets"]:
+        raise RuntimeError("Google Sheets secrets not configured.")
+    creds = Credentials.from_service_account_info(dict(st.secrets["gcp_service_account"]))
+    scoped = creds.with_scopes(["https://www.googleapis.com/auth/spreadsheets.readonly"])
+    return gspread.authorize(scoped)
 
-    # Presence of Children
-    children_data = pd.DataFrame([
-        {"Code": "Y", "Label": "Yes", "Count": 182598, "Percent": 43.35},
-        {"Code": "U", "Label": "Unknown", "Count": 238656, "Percent": 56.65},
-    ])
+@st.cache_data(show_spinner=False)
+def _read_ws(sheet_id: str, ws_name: str) -> pd.DataFrame:
+    """Read a worksheet by name into a DataFrame and coerce numeric columns."""
+    gc = _get_gs_client()
+    sh = gc.open_by_key(sheet_id)
+    ws = sh.worksheet(ws_name)
+    rows = ws.get_all_records()
+    df = pd.DataFrame(rows)
+    # Standardize common column names
+    colmap = {c: c.strip() for c in df.columns}
+    df.rename(columns=colmap, inplace=True)
+    # Normalize numeric columns if present
+    for col in ["Count", "Percent", "Age"]:
+        if col in df.columns:
+            df[col] = (
+                pd.to_numeric(
+                    df[col]
+                    .astype(str)
+                    .str.replace(",", "", regex=False)
+                    .str.replace("%", "", regex=False)
+                    .str.strip(),
+                    errors="coerce",
+                )
+            )
+    # Drop empty rows
+    df = df.dropna(how="all")
+    return df
 
-    # Estimated Household Income
-    income_rows = [
-        ("A", "Under $10,000", 8355, 1.98),
-        ("B", "$10,000 - $14,999", 22648, 5.38),
-        ("C", "$15,000 - $19,999", 11623, 2.76),
-        ("D", "$20,000 - $24,999", 7403, 1.76),
-        ("E", "$25,000 - $29,999", 17893, 4.25),
-        ("F", "$30,000 - $34,999", 9375, 2.23),
-        ("G", "$35,000 - $39,999", 20246, 4.81),
-        ("H", "$40,000 - $44,999", 11391, 2.70),
-        ("I", "$45,000 - $49,999", 20876, 4.96),
-        ("J", "$50,000 - $54,999", 12451, 2.96),
-        ("K", "$55,000 - $59,999", 17267, 4.10),
-        ("L", "$60,000 - $64,999", 18289, 4.34),
-        ("M", "$65,000 - $74,999", 28233, 6.70),
-        ("N", "$75,000 - $99,999", 69929, 16.60),
-        ("O", "$100,000 - $149,999", 84627, 20.09),
-        ("P", "$150,000 - $174,999", 10646, 2.53),
-        ("Q", "$175,000 - $199,999", 15531, 3.69),
-        ("R", "$200,000 - $249,999", 14741, 3.50),
-        ("S", "$250,000+", 19730, 4.68),
-    ]
-    income_data = pd.DataFrame(income_rows, columns=["Code", "Label", "Count", "Percent"])
-    # Ensure category order
-    income_data["Label"] = pd.Categorical(income_data["Label"], categories=[r[1] for r in income_rows], ordered=True)
+@st.cache_data(show_spinner=True)
+def load_data_from_google_sheets():
+    sid = st.secrets["sheets"]["SHEET_ID"]
+    # Read all expected tabs
+    tabs = {
+        "size_df": "Household Size",
+        "marital_df": "Household Marital Status",
+        "dwelling_df": "Dwelling Type",
+        "gender_df": "Gender",
+        "children_df": "Presence of Children",
+        "income_df": "Estimated Household Income",
+        "networth_df": "Networth",
+        "age_df": "Age",
+        "home_df": "Home Owner",
+    }
+    data = {}
+    for key, ws in tabs.items():
+        data[key] = _read_ws(sid, ws)
+    # Coerce required dtypes and ensure expected columns
+    def _ensure_cols(df, cols):
+        for c in cols:
+            if c not in df.columns:
+                df[c] = pd.NA
+        return df[cols]
 
-    # Net Worth
-    networth_rows = [
-        ("A", "Least wealthy", 76659, 18.20),
-        ("B", "Tier 2", 27793, 6.60),
-        ("C", "Tier 3", 7547, 1.79),
-        ("D", "Tier 4", 21996, 5.22),
-        ("E", "Tier 5", 26268, 6.24),
-        ("F", "Tier 6", 39978, 9.49),
-        ("G", "Tier 7", 68801, 16.33),
-        ("H", "Tier 8", 59490, 14.12),
-        ("I", "Most Wealthy", 75556, 17.94),
-        ("U", "Unknown", 17166, 4.07),
-    ]
-    networth_data = pd.DataFrame(networth_rows, columns=["Code", "Label", "Count", "Percent"])
-    networth_data["Label"] = pd.Categorical(networth_data["Label"], categories=[r[1] for r in networth_rows], ordered=True)
+    data["size_df"] = _ensure_cols(data["size_df"], ["Code", "Label", "Count", "Percent"]).copy()
+    data["marital_df"] = _ensure_cols(data["marital_df"], ["Code", "Label", "Count", "Percent"]).copy()
+    data["dwelling_df"] = _ensure_cols(data["dwelling_df"], ["Code", "Label", "Count", "Percent"]).copy()
+    data["gender_df"] = _ensure_cols(data["gender_df"], ["Code", "Label", "Count", "Percent"]).copy()
+    data["children_df"] = _ensure_cols(data["children_df"], ["Code", "Label", "Count", "Percent"]).copy()
+    data["income_df"] = _ensure_cols(data["income_df"], ["Code", "Label", "Count", "Percent"]).copy()
+    data["networth_df"] = _ensure_cols(data["networth_df"], ["Code", "Label", "Count", "Percent"]).copy()
+    data["age_df"] = _ensure_cols(data["age_df"], ["Age", "Count", "Percent"]).copy()
+    data["home_df"] = _ensure_cols(data["home_df"], ["Code", "Label", "Count", "Percent"]).copy()
 
-    # Age distribution
-    age_rows = [
-        (17, 7, 0.00), (18, 20, 0.00), (19, 152, 0.04), (20, 879, 0.21), (21, 1684, 0.40),
-        (22, 1552, 0.37), (23, 2042, 0.48), (24, 1937, 0.46), (25, 2043, 0.48), (26, 2425, 0.58),
-        (27, 3008, 0.71), (28, 3224, 0.77), (29, 4311, 1.02), (30, 5365, 1.27), (31, 6510, 1.55),
-        (32, 5788, 1.37), (33, 6021, 1.43), (34, 6132, 1.46), (35, 5908, 1.40), (36, 5675, 1.35),
-        (37, 5182, 1.23), (38, 5477, 1.30), (39, 5997, 1.42), (40, 6178, 1.47), (41, 6164, 1.46),
-        (42, 6456, 1.53), (43, 6388, 1.52), (44, 6625, 1.57), (45, 6909, 1.64), (46, 6448, 1.53),
-        (47, 6345, 1.51), (48, 6525, 1.55), (49, 6196, 1.47), (50, 6144, 1.46), (51, 6306, 1.50),
-        (52, 6339, 1.50), (53, 6572, 1.56), (54, 7259, 1.72), (55, 7264, 1.72), (56, 6774, 1.61),
-        (57, 6712, 1.59), (58, 6767, 1.61), (59, 6709, 1.59), (60, 7315, 1.74), (61, 7779, 1.85),
-        (62, 7786, 1.85), (63, 7930, 1.88), (64, 8024, 1.90), (65, 8069, 1.92), (66, 8163, 1.94),
-        (67, 7970, 1.89), (68, 8071, 1.92), (69, 7574, 1.80), (70, 7442, 1.77), (71, 7477, 1.77),
-        (72, 7016, 1.67), (73, 6950, 1.65), (74, 6675, 1.58), (75, 6338, 1.50), (76, 6043, 1.43),
-        (77, 6031, 1.43), (78, 6418, 1.52), (79, 4448, 1.06), (80, 4086, 0.97), (81, 4101, 0.97),
-        (82, 4098, 0.97), (83, 3640, 0.86), (84, 3245, 0.77), (85, 2867, 0.68), (86, 2789, 0.66),
-        (87, 2678, 0.64), (88, 2443, 0.58), (89, 2233, 0.53), (90, 2057, 0.49), (91, 1912, 0.45),
-        (92, 1846, 0.44), (93, 1786, 0.42), (94, 1615, 0.38), (95, 1575, 0.37), (96, 1330, 0.32),
-        (97, 1272, 0.30), (98, 1163, 0.28), (99, 1006, 0.24), (100, 942, 0.22), (101, 824, 0.20),
-        (102, 692, 0.16), (103, 419, 0.10), (104, 35, 0.01), (105, 117, 0.03), (106, 314, 0.07),
-        (107, 19, 0.00), (108, 12, 0.00), (109, 7, 0.00), (110, 9, 0.00), (111, 7, 0.00), (112, 4, 0.00),
-        (113, 10, 0.00), (114, 3, 0.00),
-    ] 
-    age_data = pd.DataFrame(age_rows, columns=["Age", "Count", "Percent"])
+    # Compute TOTAL from any table with Count
+    total_candidates = []
+    for k in ["size_df", "marital_df", "gender_df", "children_df", "income_df", "networth_df", "home_df"]:
+        df = data[k]
+        if "Count" in df.columns and df["Count"].notna().any():
+            total_candidates.append(df["Count"].sum())
+    TOTAL = int(max(total_candidates)) if total_candidates else 0
 
-    # Age Unknown and Totals
-    age_unknown = pd.DataFrame([{"Age": "Unknown", "Count": 14160, "Percent": 3.36}])
-
-    total_households = 421_254
+    # Age unknown (if present as a separate row). If none, set 0.
+    age_unknown_df = pd.DataFrame([{"Age": "Unknown", "Count": 0, "Percent": 0.0}])
 
     return (
-        total_households,
-        size_data,
-        marital_data,
-        dwelling_data,
-        gender_data,
-        children_data,
-        income_data,
-        networth_data,
-        age_data,
-        age_unknown,
+        TOTAL,
+        data["size_df"],
+        data["marital_df"],
+        data["dwelling_df"],
+        data["gender_df"],
+        data["children_df"],
+        data["income_df"],
+        data["networth_df"],
+        data["age_df"],
+        age_unknown_df,
+        data["home_df"],
     )
-
-
-def tidy_percent(x):
-    return f"{x:.2f}%"
-
-
-def value_mode(df, value_col="Count"):
-    row = df.loc[df[value_col].idxmax()]
-    return row
-
-
-def median_bucket(df, order_col="Label", count_col="Count"):
-    # Assumes ordered categorical in order_col
-    temp = df[[order_col, count_col]].copy()
-    temp["CumCount"] = temp[count_col].cumsum()
-    half = temp[count_col].sum() / 2
-    median_label = temp.loc[temp["CumCount"] >= half, order_col].iloc[0]
-    return median_label
-
 
 # ---------------------------
 # Load
 # ---------------------------
-(
-    TOTAL,
-    size_df,
-    marital_df,
-    dwelling_df,
-    gender_df,
-    children_df,
-    income_df,
-    networth_df,
-    age_df,
-    age_unknown_df,
-) = load_data()
+# Try Google Sheets first; fall back to built-in sample data
+try:
+    (
+        TOTAL,
+        size_df,
+        marital_df,
+        dwelling_df,
+        gender_df,
+        children_df,
+        income_df,
+        networth_df,
+        age_df,
+        age_unknown_df,
+        home_df,
+    ) = load_data_from_google_sheets()
+    st.success("Loaded data from Google Sheets (st.secrets)")
+except Exception as e:
+    st.warning(f"Google Sheets not configured or failed ({e}). Using sample data bundled in app.")
+    (
+        TOTAL,
+        size_df,
+        marital_df,
+        dwelling_df,
+        gender_df,
+        children_df,
+        income_df,
+        networth_df,
+        age_df,
+        age_unknown_df,
+    ) = load_data()
+    # Build home_df from sample rows
+    # Using home_df loaded earlier (Google Sheets or sample fallback)
 
 # ---------------------------
 # Sidebar Controls
@@ -402,12 +406,7 @@ all_tables = {
     "income.csv": income_df,
     "networth.csv": networth_df,
     "age.csv": pd.concat([age_df, age_unknown_df], ignore_index=True),
-    "home_ownership.csv": pd.DataFrame([
-        {"Code": "H", "Label": "Highly Likely Home Owner", "Count": 1758, "Percent": 0.42},
-        {"Code": "P", "Label": "Probably Home Owner", "Count": 17992, "Percent": 4.27},
-        {"Code": "V", "Label": "Verified Home Owner", "Count": 320203, "Percent": 76.01},
-        {"Code": "U", "Label": "Unknown", "Count": 81301, "Percent": 19.30},
-    ])
+    "home_ownership.csv": home_df,
 }
 
 selected_export = st.sidebar.selectbox("Select a table to download", list(all_tables.keys()))

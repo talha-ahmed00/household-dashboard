@@ -118,8 +118,13 @@ def _read_ws(sheet_id: str, ws_name: str) -> pd.DataFrame:
     # Drop empty rows
     df = df.dropna(how="all")
     return df
+st.sidebar.header("🔄 Data Controls")
 
-@st.cache_data(show_spinner=True)
+if st.sidebar.button("Refresh Data"):
+    st.cache_data.clear()
+    st.experimental_rerun()
+
+@st.cache_data(ttl=300, show_spinner=False)  # ttl = seconds
 def load_data_from_google_sheets():
     sid = st.secrets["sheets"]["SHEET_ID"]
     # Read all expected tabs

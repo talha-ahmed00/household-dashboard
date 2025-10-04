@@ -29,6 +29,29 @@ def tidy_percent(val):
         return f"{float(val):.2f}%"
     except Exception:
         return "0.00%"
+
+def value_mode(df):
+    """
+    Return the row (as a dict) with the highest Count value.
+    Used to identify the most common category.
+    """
+    if "Count" not in df.columns or df["Count"].isna().all():
+        return {"Label": "N/A", "Percent": 0}
+    top_row = df.loc[df["Count"].idxmax()]
+    return {"Label": top_row.get("Label", "N/A"), "Percent": top_row.get("Percent", 0)}
+
+
+def median_bucket(df):
+    """
+    Approximate median category by cumulative Count.
+    Returns the Label whose cumulative share crosses 50%.
+    """
+    if "Count" not in df.columns or df["Count"].isna().all():
+        return "N/A"
+    df_sorted = df.copy()
+    df_sorted["cum_share"] = df_sorted["Count"].cumsum() / df_sorted["Count"].sum()
+    med_row = df_sorted.loc[df_sorted["cum_share"] >= 0.5].iloc[0]
+    return med_row.get("Label", "N/A")
 # --- Google Sheets helpers (optional) ---
 # This app will automatically use a Google Sheet if Streamlit secrets are
 # configured. Otherwise it falls back to the built-in sample data.

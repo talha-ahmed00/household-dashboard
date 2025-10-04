@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from io import StringIO
-
+import json
 # ---------------------------
 # Page Config
 # ---------------------------
@@ -17,8 +17,18 @@ st.set_page_config(
 # ---------------------------
 # Helpers
 # ---------------------------
-import json
 
+# ---------------------------
+# Helpers
+# ---------------------------
+
+def tidy_percent(val):
+    if hasattr(val, "iloc"):
+        val = float(val.iloc[0]) if not val.empty else 0
+    try:
+        return f"{float(val):.2f}%"
+    except Exception:
+        return "0.00%"
 # --- Google Sheets helpers (optional) ---
 # This app will automatically use a Google Sheet if Streamlit secrets are
 # configured. Otherwise it falls back to the built-in sample data.

@@ -202,7 +202,7 @@ try:
         age_unknown_df,
         home_df,
     ) = load_data_from_google_sheets()
-    st.success("Loaded data from Google Sheets (st.secrets)")
+    st.success("Loaded data")
 except Exception as e:
     st.warning(f"Google Sheets not configured or failed ({e}). Using sample data bundled in app.")
     (
@@ -452,9 +452,3 @@ if selected_export:
     csv = all_tables[selected_export].to_csv(index=False)
     st.sidebar.download_button("Download CSV", csv, file_name=selected_export, mime="text/csv")
 
-st.sidebar.markdown("""
-**How to run**
-1. Save this file as `household_dashboard_streamlit.py`.
-2. Install dependencies: `pip install streamlit plotly pandas`.
-3. Run: `streamlit run household_dashboard_streamlit.py`.
-""")

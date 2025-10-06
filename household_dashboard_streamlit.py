@@ -56,7 +56,7 @@ with st.sidebar:
         st.markdown(
             f"""
             <div class="sidebar-logo-box">
-                <img src="https://raw.githubusercontent.com/USERNAME/REPO/main/GE%20Logo.png">
+                <https://github.com/talha-ahmed00/household-dashboard/blob/main/GE%20Logo.png">
             </div>
             """,
             unsafe_allow_html=True

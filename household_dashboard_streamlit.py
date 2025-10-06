@@ -31,21 +31,38 @@ st.set_page_config(
 with st.sidebar:
     if LOGO_PATH.exists():
         st.markdown(
-            "<div style='background:white;padding:12px;border-radius:12px;"
-            "text-align:center;box-shadow:0 0 8px rgba(0,0,0,0.08);'>",
-            unsafe_allow_html=True,
+            """
+            <style>
+            .sidebar-logo-box {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                background-color: white;
+                padding: 18px 10px;
+                border-radius: 12px;
+                margin-bottom: 15px;
+                box-shadow: 0 0 8px rgba(0,0,0,0.15);
+            }
+            .sidebar-logo-box img {
+                width: 90%;
+                height: auto;
+                object-fit: contain;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
         )
-        st.image(Image.open(LOGO_PATH), use_column_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown(
+            f"""
+            <div class="sidebar-logo-box">
+                <img src="https://raw.githubusercontent.com/USERNAME/REPO/main/GE%20Logo.png">
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
     else:
-        st.info(f"Logo not found: {LOGO_PATH.name}")
-def tidy_percent(val):
-    if hasattr(val, "iloc"):
-        val = float(val.iloc[0]) if not val.empty else 0
-    try:
-        return f"{float(val):.2f}%"
-    except Exception:
-        return "0.00%"
+        st.info("Logo not found — make sure 'GE Logo.png' is in your app folder.")
 
 def value_mode(df):
     """

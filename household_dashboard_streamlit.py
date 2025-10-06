@@ -21,7 +21,7 @@ st.set_page_config(
 # ---------------------------
 # Helpers
 # ---------------------------
-
+st.sidebar.image("GE Logo.png", width=200)
 def tidy_percent(val):
     if hasattr(val, "iloc"):
         val = float(val.iloc[0]) if not val.empty else 0

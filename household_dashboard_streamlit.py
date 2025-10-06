@@ -28,41 +28,7 @@ st.set_page_config(
 # ---------------------------
 # Helpers
 # ---------------------------
-with st.sidebar:
-    if LOGO_PATH.exists():
-        st.markdown(
-            """
-            <style>
-            .sidebar-logo-box {
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                background-color: white;
-                padding: 18px 10px;
-                border-radius: 12px;
-                margin-bottom: 15px;
-                box-shadow: 0 0 8px rgba(0,0,0,0.15);
-            }
-            .sidebar-logo-box img {
-                width: 90%;
-                height: auto;
-                object-fit: contain;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-
-        st.markdown(
-            f"""
-            <div class="sidebar-logo-box">
-                <https://github.com/talha-ahmed00/household-dashboard/blob/main/GE%20Logo.png">
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    else:
-        st.info("Logo not found — make sure 'GE Logo.png' is in your app folder.")
+st.sidebar.image("logo-white.png", width=200)
 
 def tidy_percent(val):
     """Format numeric or Series as percent string."""

@@ -64,6 +64,7 @@ with st.sidebar:
     else:
         st.info("Logo not found — make sure 'GE Logo.png' is in your app folder.")
 
+def tidy_percent(val): if hasattr(val, "iloc"): val = float(val.iloc[0]) if not val.empty else 0 try: return f"{float(val):.2f}%" except Exception: return "0.00%"
 def value_mode(df):
     """
     Return the row (as a dict) with the highest Count value.
